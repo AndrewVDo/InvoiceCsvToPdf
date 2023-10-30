@@ -9,9 +9,11 @@ from reportlab.pdfgen.canvas import Canvas
 from reportlab.lib.pagesizes import letter
 
 class RowWriter:
+    static_sum = 0
     row = None
     packet = None
     canvas = None
+    
 
     def __init__(self, row):
         self.row = row
@@ -79,6 +81,8 @@ class RowWriter:
         self.draw(430, 225, '$0.00', asRowName=False)
         self.draw(430, 200, 'subtotal', isDollar=True)
 
+        RowWriter.static_sum += float(self.getData('subtotal'))
+
     def drawItemized(self):
         itemizedList = []
         if not math.isnan(self.row['deposit']):
@@ -99,7 +103,7 @@ class RowWriter:
             amnt = self.getData('flat_rate', isDollar=True)
             itemizedList.append([desc, date, "", amnt])
 
-        if not math.isnan(self.row['hours']):
+        if not math.isnan(self.row['hours']) and math.isnan(self.row['flat_rate']):
             desc = "Hourly charge for {} @{} hours.".format(self.getDescription(), self.getData('hours'))
             date = self.getBestAppointmentDate()
             rate = "$180.00"
@@ -135,15 +139,28 @@ class TaxWrapper:
 
     def __init__(self, filename):
         self.readCSV(filename)
-        self.showSummary()
+        # self.showSummary()
         print("Processing Data...")
         self.calculateInvoiceNumberColumn()
         self.calculateRebateColumn()
         self.calculateSubtotalColumn()
         print("Done.")
-        self.showSummary()
+        # self.findDuplicateNames()
+        # self.showSummary()
         self.createPDFs()
 
+    def findDuplicateNames(self):
+        names = {}
+        dupe = []
+        for index, row in self.data.iterrows():
+            if row['name'] in names:
+                names[row['name']] += 1
+            else:
+                names[row['name']] = 1
+        for name in names:
+            if names[name] > 1:
+                dupe.append(name)
+        print(dupe)
 
     def readCSV(self, filename):
         self.data = pd.read_csv(filename)
@@ -200,7 +217,9 @@ class TaxWrapper:
 
 
 def main():
-    data = TaxWrapper('test-sheet.csv')
+    data = TaxWrapper('data.csv')
+    print("Total: {}".format(RowWriter.static_sum))
 
 if __name__ == "__main__":
     main()
+
